@@ -1,27 +1,98 @@
-# NewIfSyntax
+# New @If syntax
 
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 17.0.3.
 
-## Development server
+[Angular @if: Complete Guide](https://blog.angular-university.io/angular-if/)
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+## Why don't we need to import @if?
 
-## Code scaffolding
+Notice that we don't have to **import** the `@if` directive from `@angular/common` into our component templates anymore.
+This is because the `@if` syntax **is part of the template engine** itself, and it is **not a directive**.
+The new `@if` is **built-in directly into the template engine**, so it's automatically *available everywhere*.
+It's just like the `{{ variable }}` interpolation syntax or the i18n syntax - you don't need to import anything in order to use it.
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+## Why don't we need to use the * syntax anymore?
 
-## Build
+The bottom line is that with `@if` we don't need to use the `*` syntax anymore, because `@if` is **not a structural directive**.
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+## How to easily migrate to the new @if syntax?
 
-## Running unit tests
+The Angular CLI has an automated migration for upgrading all your code to the new `@if` syntax:
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+```bash
+ng generate @angular/core:control-flow
+```
 
-## Running end-to-end tests
+This command will migrate all the `*ngIf` directives in your project to the new syntax, not only for `@if` but also for the `@for` and `@switch` syntax.
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+## Multiple nested @if async pipe anti-pattern
 
-## Further help
+This anti-pattern is sometimes known as "async pipe chaining" or "pyramid of doom".
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+Here is an example of this `@if` anti-pattern:
+
+```html
+@if (user$ | async; as user) {
+    ....
+    @if (course$ | async; as course) {
+        ....
+        @if (lessons$ | async; as lesson) {
+            ....
+        }
+    }
+}
+```
+
+A good way to avoid this is to **refactor** your component so that it provides **one single** `data$` observable, containing **all** the data that the page needs.
+Start by defining one interface that contains all the data that the page needs:
+
+```typescript
+interface PageData {
+    user: User;
+    course: Course;
+    lessons: Lesson[];
+}
+```
+
+Then, define a single `data$` observable that contains **all** the data that the page needs:
+
+```typescript
+@Component
+export class Component implements OnInit {
+    
+  private data$: Observable<PageData>;
+
+  ngOnInit() {
+    
+    const user$ = // ... initialize user$ observable
+
+    const course$  = // ... initialize course$ observable
+
+    const lessons$ = // ... initialize lessons$ observable    
+    
+    this.data$ = combineLatest([user$, course$, lessons$])
+      .pipe(
+        map(([user, course, lessons]) => {
+          return {
+                user, 
+                course, 
+                lessons
+            }
+        })
+    );
+  }
+}
+```
+
+Finally, use `@if` in combination with the async pipe to unwrap the `data$` observable in the template:
+
+```html
+@if (data$ | async; as data) {
+    ....
+    {{ data.course }}
+
+    {{ data.user }}
+
+    {{ data.lessons }}
+}
+```
